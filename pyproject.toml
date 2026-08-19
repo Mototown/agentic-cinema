@@ -14,6 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["pypdf>=4.0.0"]
+gcp = ["google-adk", "google-auth"]
 
 [project.scripts]
 breakdown = "agentic_cinema.__main__:main"
