@@ -1,0 +1,3 @@
+# Core: stdlib only. Optional extras:
+# pypdf>=4.0.0
+# google-genai>=1.0.0
