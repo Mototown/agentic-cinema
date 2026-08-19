@@ -11,6 +11,17 @@ Hackathon: [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.de
 - Input is a production-format screenplay (INT./EXT. headings). PDF needs optional `pypdf`.
 - Sample script is original and short.
 
+## Open in IBM Bob
+
+IBM Bob has **not** been used yet. There is no session to export. After you open this repo in Bob, do the three tasks listed at the top of [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) (parser tests, O.S./V.O. characters, watsonx fail-closed tests). Run these first so you know the baseline:
+
+```bash
+python3 examples/run_breakdown.py
+python3 -m unittest discover -s tests
+```
+
+Expected demo shape: title `Dust On The Glass`, 4 scenes, 3 continuity flags, 4 shooting groups. Do not invent past Bob sessions.
+
 ## The problem
 
 Pre-production still starts with walking a screenplay by hand: who is in the scene, where it is, day or night, what has to be on the truck, what might be VFX, and which scenes can share a company move.
@@ -34,6 +45,7 @@ python3 -m pip install -e .
 python3 -m agentic_cinema examples/sample_script.txt
 # or
 python3 examples/run_breakdown.py
+python3 -m unittest discover -s tests
 ```
 
 With Gemini (still no GCP):
@@ -94,13 +106,14 @@ export WATSONX_PROJECT_ID="watsonx-project-id"
 # optional: export WATSONX_URL=https://us-south.ml.cloud.ibm.com
 python3 scripts/ibm_watsonx_check.py
 python3 examples/run_breakdown.py
+python3 -m unittest discover -s tests
 ```
 
 Confluent is optional on this track and is not integrated.
 
 ## Next IBM-track steps
 
-1. **Use IBM Bob on this repo** and export a real session report (track requirement).
+1. **Open this repo in IBM Bob** and do the three tasks in [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md). Export a real session report.
 2. Set watsonx credentials and confirm a live Granite continuity review (no keys in git).
 3. Optional Confluent, if you want evented breakdown jobs.
 4. Public repo + license for judging.
@@ -115,4 +128,5 @@ adk_agent/              ADK root_agent for Agent Engine
 scripts/                deploy_agent_engine.py, ibm_watsonx_check.py (both fail closed)
 DEVELOPMENT_LOG.md      factual IBM Bob / watsonx status
 examples/               sample script + runner
+tests/                  stdlib unittest lock for the sample demo
 ```

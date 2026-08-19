@@ -157,6 +157,6 @@ def _merge(local: dict[str, Any], remote: dict[str, Any], model: str) -> dict[st
             out["scenes"] = merged_scenes
     notes = list(local.get("notes") or [])
     notes = [n for n in notes if "not Gemini" not in n and "local heading" not in n.lower()]
-    notes.insert(0, f"Gemini ({model}) refined the local skeleton. Partner tool is not integrated.")
+    notes.insert(0, f"Gemini ({model}) refined the local skeleton.")
     out["notes"] = notes
     return out
