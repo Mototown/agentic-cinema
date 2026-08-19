@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.gemini_client import GeminiClient
+from agents.watsonx_client import WatsonxClient
 from agentic_cinema.continuity import flag_continuity
 from agentic_cinema.groups import shooting_groups
 from agentic_cinema.models import Breakdown, ContinuityFlag, Scene, ShootingGroup
@@ -13,8 +14,9 @@ from agentic_cinema.parser import load_script, parse_scenes
 class BreakdownAgent:
     """Accept a screenplay path or raw text. Return a structured breakdown."""
 
-    def __init__(self, gemini: GeminiClient | None = None) -> None:
+    def __init__(self, gemini: GeminiClient | None = None, watsonx: WatsonxClient | None = None) -> None:
         self.gemini = gemini or GeminiClient()
+        self.watsonx = watsonx or WatsonxClient()
 
     def run(self, source: str | Path, *, raw_text: str | None = None) -> Breakdown:
         if raw_text is None:
@@ -36,10 +38,9 @@ class BreakdownAgent:
                     props.append(p)
         notes = [
             "Engine is a local heading/character/prop heuristic until Gemini runs.",
-            "Partner tool is not integrated.",
         ]
         if self.gemini.enabled:
-            notes = ["Partner tool is not integrated."]
+            notes = []
         if not scenes:
             notes.append("No INT./EXT. scene headings found. Use a production-format script.")
         bd = Breakdown(
@@ -55,6 +56,7 @@ class BreakdownAgent:
             notes=notes,
         )
         refined = self.gemini.refine_breakdown(text, bd.to_dict())
+        refined = self.watsonx.review_continuity(refined)
         return _hydrate(refined, source_name=source_name, original_scenes=scenes)
 
     def run_json(self, source: str | Path, **kwargs: Any) -> dict[str, Any]:

@@ -7,7 +7,7 @@ Hackathon: [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.de
 - This repo is **private** for now. A judging submission will likely need a **public** repo plus a license file; that is not done here.
 - **Gemini is live** when `GEMINI_API_KEY` is set (official `google-genai` SDK). Without a key, the sample demo still runs on the local heuristic parser.
 - **Agent Engine is wired, not deployed.** `adk_agent/` is a real ADK `root_agent` that calls `BreakdownAgent`. `scripts/deploy_agent_engine.py` will not claim a deploy if `GOOGLE_CLOUD_PROJECT` or Application Default Credentials are missing.
-- **No partner integration** (IBM, Grafana, Parallel, ClickHouse, Replit). Not chosen yet.
+- **IBM track chosen.** watsonx.ai Granite is wired in code (`agents/watsonx_client.py`). IBM Bob has **not** been used on this repo yet; see [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md).
 - Input is a production-format screenplay (INT./EXT. headings). PDF needs optional `pypdf`.
 - Sample script is original and short.
 
@@ -68,17 +68,51 @@ Optional local ADK smoke (still not a cloud deploy):
 adk run adk_agent
 ```
 
-## Next two development priorities
+## Built with IBM Bob
 
-1. **Actually deploy** on a GCP project and record the Agent Engine resource name (this repo only has the path).
-2. **Partner track** — pick one of IBM, Grafana, Parallel, ClickHouse, or Replit and **call it in code**.
+**Not yet.** IBM Bob is IBM’s agentic SDLC coding partner ([bob.ibm.com](https://www.ibm.com/products/bob), [IBM track resources](https://agentic-cinema.devpost.com/details/ibm-resources)). The IBM track requires demonstrating Bob as part of development. Existing commits were produced outside Bob (local Cursor / Grok Bot). There is no Bob session to export.
+
+Planned (required for the IBM track):
+
+1. Open this repo in IBM Bob.
+2. Continue development there (planning, code, tests, review).
+3. Export the Bob session / report for judges. Do not invent sessions.
+
+watsonx.ai (below) is a real IBM Cloud API call at runtime. It does **not** replace Bob.
+
+## IBM watsonx.ai (runtime hook)
+
+`BreakdownAgent` calls `WatsonxClient.review_continuity` after the local parse (and optional Gemini). That client:
+
+1. Reads `WATSONX_API_KEY` (or `WATSONX_APIKEY`) and `WATSONX_PROJECT_ID`. Optional: `WATSONX_URL` (default `https://us-south.ml.cloud.ibm.com`), `WATSONX_MODEL` (default `ibm/granite-3-8b-instruct`).
+2. If either required env var is missing, it **does not** call IBM. The demo still works. `scripts/ibm_watsonx_check.py` prints `NOT CONFIGURED` and exits 1.
+3. If both are set, it requests an IAM token from `https://iam.cloud.ibm.com/identity/token`, then POSTs text generation to watsonx.ai. On HTTP/API failure it keeps the local/Gemini breakdown and notes the failure. No secrets are committed.
+
+```bash
+export WATSONX_API_KEY="ibm-cloud-api-key"
+export WATSONX_PROJECT_ID="watsonx-project-id"
+# optional: export WATSONX_URL=https://us-south.ml.cloud.ibm.com
+python3 scripts/ibm_watsonx_check.py
+python3 examples/run_breakdown.py
+```
+
+Confluent is optional on this track and is not integrated.
+
+## Next IBM-track steps
+
+1. **Use IBM Bob on this repo** and export a real session report (track requirement).
+2. Set watsonx credentials and confirm a live Granite continuity review (no keys in git).
+3. Optional Confluent, if you want evented breakdown jobs.
+4. Public repo + license for judging.
+5. Deploy Agent Engine on a real GCP project and record the resource name.
 
 ## Layout
 
 ```
 src/agentic_cinema/     models, parser, continuity, shooting groups
-agents/                 BreakdownAgent + Gemini client
+agents/                 BreakdownAgent, Gemini client, watsonx.ai client
 adk_agent/              ADK root_agent for Agent Engine
-scripts/                deploy_agent_engine.py (fails closed)
+scripts/                deploy_agent_engine.py, ibm_watsonx_check.py (both fail closed)
+DEVELOPMENT_LOG.md      factual IBM Bob / watsonx status
 examples/               sample script + runner
 ```
