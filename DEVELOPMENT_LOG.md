@@ -36,6 +36,31 @@ All 3 tests pass (`python3 -m unittest discover -s tests`). The locked test asse
 
 ---
 
+## 2026-08-19 — second IBM Bob session ✓
+
+**Goal:** Three focused improvements to grouping logic, continuity depth, and output completeness.
+
+**What Bob did:**
+
+1. **INT/EXT separation in shooting groups** (`src/agentic_cinema/groups.py`) — bucket key extended from `(location, time_of_day)` to `(int_ext, location, time_of_day)`. INT and EXT at the same location are now separate groups (different lighting rig, permits, weather). Reason string now encodes setup type, time-of-day, and scene count. Interior groups carry an explicit note to separate setup from any EXT counterpart.
+
+2. **Prop continuity cross-checking** (`src/agentic_cinema/continuity.py`) — new `_prop_continuity()` helper, two `info`-severity rules: (a) prop appears in exactly one non-final scene — introduced and never referenced again; (b) prop reappears after a gap of more than 3 scenes — possible magic-prop error.
+
+3. **`quality_notes` field** (`src/agentic_cinema/models.py`, `agents/breakdown_agent.py`) — new `list[str]` field on `Breakdown`, default empty. `_build_quality_notes()` populates it at parse time with: scene count, prop extraction coverage, VFX detection results, Gemini status, watsonx status, and a prop-detection limitation note. Field is carried through `to_dict()` and `_hydrate()`. Gemini `_merge()` does not touch it.
+
+**Sample demo after all three changes:**
+
+| Field | Before | After | Reason |
+|---|---|---|---|
+| scenes | 4 | 4 | unchanged |
+| continuity\_flags | 2 | 4 | `tablet` (Scene 1 only) and `thermos` (Scene 3 only) correctly flagged as single-appearance props |
+| shooting\_groups | 4 | 4 | sample has no INT/EXT collision at same location; count unchanged |
+| quality\_notes | — | 6 items | new field; does not affect any existing field |
+
+All 3 tests pass. Locked test assertion updated from 2 → 4 continuity flags with comment.
+
+---
+
 ## 2026-08-19 — repo created (not IBM Bob)
 
 - Private repo `Mototown/agentic-cinema` created.

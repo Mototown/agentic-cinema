@@ -43,7 +43,9 @@ class BreakdownAgent:
             notes = []
         if not scenes:
             notes.append("No INT./EXT. scene headings found. Use a production-format script.")
-        quality_notes = _build_quality_notes(scenes, self.gemini, self.watsonx)
+        flags = flag_continuity(scenes)
+        groups = shooting_groups(scenes)
+        quality_notes = _build_quality_notes(scenes, flags, groups, self.gemini, self.watsonx)
         bd = Breakdown(
             title=title,
             source=source_name,
@@ -52,8 +54,8 @@ class BreakdownAgent:
             locations=locations,
             props=props,
             scenes=scenes,
-            continuity_flags=flag_continuity(scenes),
-            shooting_groups=shooting_groups(scenes),
+            continuity_flags=flags,
+            shooting_groups=groups,
             notes=notes,
             quality_notes=quality_notes,
         )
@@ -124,35 +126,77 @@ def _hydrate(data: dict[str, Any], *, source_name: str, original_scenes: list[Sc
 
 def _build_quality_notes(
     scenes: list[Scene],
+    flags: "list[ContinuityFlag]",
+    groups: "list[ShootingGroup]",
     gemini: "GeminiClient",
     watsonx: "WatsonxClient",
 ) -> list[str]:
-    """Summarise analysis completeness for the coordinator."""
+    """Summarise analysis completeness and biggest risks for the coordinator."""
     qn: list[str] = []
     n = len(scenes)
     if n == 0:
         qn.append("No scenes parsed — check that the script uses INT./EXT. headings.")
+        qn.append("NOT READY for scheduling — no scene data available.")
         return qn
-    qn.append(f"{n} scene{'s' if n != 1 else ''} parsed.")
+
+    # ── Analysis coverage ─────────────────────────────────────────
+    qn.append(f"{n} scene{'s' if n != 1 else ''} parsed across {len(groups)} shooting group{'s' if len(groups) != 1 else ''}.")
     chars_with_props = sum(1 for s in scenes if s.props)
     qn.append(
         f"Props extracted from {chars_with_props} of {n} scene{'s' if n != 1 else ''} "
-        f"using verb-pattern heuristic (picks up / grabs / holds etc.)."
+        f"(verb-pattern heuristic: picks up / grabs / holds etc. — "
+        f"props mentioned without a handling verb may be missed)."
     )
     vfx_scenes = [s.number for s in scenes if s.vfx_notes]
     if vfx_scenes:
-        qn.append(f"VFX keywords detected in scene{'s' if len(vfx_scenes) != 1 else ''} {vfx_scenes}.")
+        qn.append(
+            f"VFX keywords detected in scene{'s' if len(vfx_scenes) != 1 else ''} "
+            f"{vfx_scenes} — confirm with VFX supervisor before locking schedule."
+        )
     else:
         qn.append("No VFX keywords detected.")
+
+    # ── Continuity risk summary ────────────────────────────────────
+    warns = [f for f in flags if f.severity == "warn"]
+    infos = [f for f in flags if f.severity == "info"]
+    if warns:
+        qn.append(
+            f"CONTINUITY RISKS — {len(warns)} warning{'s' if len(warns) != 1 else ''} require attention: "
+            + "; ".join(f.message.rstrip(".") for f in warns) + "."
+        )
+    else:
+        qn.append("No continuity warnings found (teleportation, day/night flip checks passed).")
+    if infos:
+        qn.append(
+            f"{len(infos)} info flag{'s' if len(infos) != 1 else ''}: "
+            + "; ".join(f.message.rstrip(".") for f in infos) + "."
+        )
+
+    # ── LLM enrichment status ─────────────────────────────────────
     if gemini.enabled:
         qn.append(f"Gemini ({gemini.model}) will refine characters, props, and flags.")
     else:
-        qn.append("Gemini not active (GEMINI_API_KEY not set) — using local heuristic only.")
+        qn.append("Gemini not active (GEMINI_API_KEY not set) — local heuristic only.")
     if watsonx.enabled:
         qn.append(f"IBM watsonx.ai ({watsonx.model}) will review continuity flags.")
     else:
         qn.append("IBM watsonx.ai not active (WATSONX_API_KEY / WATSONX_PROJECT_ID not set).")
-    qn.append(
-        "Prop detection uses verb patterns only — props mentioned without a handling verb may be missed."
-    )
+
+    # ── Scheduling readiness verdict ──────────────────────────────
+    blockers: list[str] = []
+    if warns:
+        blockers.append(f"{len(warns)} unresolved continuity warning{'s' if len(warns) != 1 else ''}")
+    if not gemini.enabled and not watsonx.enabled:
+        blockers.append("no LLM enrichment active — character/prop lists may be incomplete")
+    if blockers:
+        qn.append(
+            "SCHEDULING READINESS: review needed — "
+            + "; ".join(blockers)
+            + ". Resolve before first scheduling pass."
+        )
+    else:
+        qn.append(
+            "SCHEDULING READINESS: breakdown is ready for a first scheduling pass. "
+            "Verify cast availability and location permits before locking days."
+        )
     return qn
