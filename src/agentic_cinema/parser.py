@@ -17,7 +17,9 @@ HEADING = re.compile(
     re.I,
 )
 CHARACTER = re.compile(r"^([A-Z][A-Z0-9 '\-]{1,30})$")
-SKIP_CUES = {"V.O", "O.S", "CONT'D", "CONTINUED", "FADE IN", "FADE OUT", "CUT TO", "THE END"}
+# Parenthetical extensions that follow a character name cue (stripped before matching)
+_PAREN = re.compile(r"\s*\([^)]*\)\s*$")
+SKIP_CUES = {"CONT'D", "CONTINUED", "FADE IN", "FADE OUT", "CUT TO", "THE END"}
 PROP_VERBS = re.compile(
     r"\b(?:picks? up|grabs?|holds?|puts? down|sets? down|pulls? out|draws?|wields?|checks?)\s+(?:the|a|an|his|her|their)\s+([a-z][a-z0-9 \-]{2,40})",
     re.I,
@@ -109,9 +111,12 @@ def _characters(body_lines: list[str]) -> list[str]:
     found: list[str] = []
     for ln in body_lines:
         s = ln.strip()
-        if not s or not CHARACTER.match(s):
+        if not s:
             continue
-        name = re.sub(r"\s*\(.*\)$", "", s).strip()
+        # Strip trailing parentheticals like (O.S.), (V.O.), (CONT'D) before matching
+        name = _PAREN.sub("", s).strip()
+        if not CHARACTER.match(name):
+            continue
         if any(tok in name for tok in SKIP_CUES):
             continue
         if name not in found:

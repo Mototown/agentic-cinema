@@ -121,7 +121,10 @@ def _prompt(payload: dict[str, Any]) -> str:
             {
                 "number": s.get("number"),
                 "heading": s.get("heading"),
+                "time_of_day": s.get("time_of_day"),
                 "characters": s.get("characters"),
+                "props": s.get("props"),
+                "vfx_notes": s.get("vfx_notes"),
             }
             for s in (payload.get("scenes") or [])
         ],
@@ -130,6 +133,8 @@ def _prompt(payload: dict[str, Any]) -> str:
     return (
         "You are a script supervisor. Given this breakdown JSON, list extra continuity risks "
         "as JSON array only: [{\"severity\":\"warn|info\",\"scene_numbers\":[1],\"message\":\"...\"}]. "
+        "Focus on: prop consistency across scenes, VFX requirements that affect adjacent scenes, "
+        "time-of-day conflicts, and character state (injuries, wardrobe). "
         "If none, return []. Do not invent cast or vendors.\n"
         + json.dumps(slim)
     )

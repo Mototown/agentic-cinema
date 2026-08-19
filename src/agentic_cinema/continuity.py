@@ -2,25 +2,46 @@ from __future__ import annotations
 
 from agentic_cinema.models import ContinuityFlag, Scene
 
+# Maximum scene gap within which a same-time-of-day location jump is flagged as
+# a potential teleportation. Increase for feature-length scripts.
+_DEFAULT_TELEPORT_WINDOW = 5
 
-def flag_continuity(scenes: list[Scene]) -> list[ContinuityFlag]:
+
+def flag_continuity(scenes: list[Scene], *, max_scene_gap: int = _DEFAULT_TELEPORT_WINDOW) -> list[ContinuityFlag]:
     flags: list[ContinuityFlag] = []
+    # Maps character name → (scene_index, location) of their most recent appearance
     last_loc: dict[str, tuple[int, str]] = {}
 
     for i, scene in enumerate(scenes):
         for name in scene.characters:
             prev = last_loc.get(name)
-            if prev and prev[1] != scene.location:
-                prev_scene = scenes[prev[0]]
-                same_tod = prev_scene.time_of_day == scene.time_of_day
-                if prev[0] == i - 1 and same_tod:
-                    flags.append(
-                        ContinuityFlag(
-                            severity="warn",
-                            scene_numbers=[prev_scene.number, scene.number],
-                            message=f"{name} is at {prev_scene.location} then {scene.location} in consecutive {scene.time_of_day} scenes with no time flag.",
+            if prev is not None:
+                prev_idx, prev_location = prev
+                gap = i - prev_idx
+                if prev_location != scene.location:
+                    prev_scene = scenes[prev_idx]
+                    same_tod = prev_scene.time_of_day == scene.time_of_day
+                    # Flag if same time-of-day and within the scene window.
+                    # Consecutive scenes are flagged regardless of gap (gap==1 always qualifies).
+                    if same_tod and gap <= max_scene_gap:
+                        if gap == 1:
+                            msg = (
+                                f"{name} is at {prev_location} then {scene.location} "
+                                f"in consecutive {scene.time_of_day} scenes with no time flag."
+                            )
+                        else:
+                            msg = (
+                                f"{name} moves from {prev_location} (Scene {prev_scene.number}) "
+                                f"to {scene.location} (Scene {scene.number}) "
+                                f"across {gap} scenes with no location transition — check travel time."
+                            )
+                        flags.append(
+                            ContinuityFlag(
+                                severity="warn",
+                                scene_numbers=[prev_scene.number, scene.number],
+                                message=msg,
+                            )
                         )
-                    )
             last_loc[name] = (i, scene.location)
 
         if i > 0:

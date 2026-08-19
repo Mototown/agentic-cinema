@@ -1,4 +1,10 @@
-"""Lock the local sample demo. IBM Bob / later edits must not change this output."""
+"""Lock the local sample demo. IBM Bob / later edits must not change this output.
+
+2026-08-19 (IBM Bob session 1): parser fix for O.S./V.O. cues correctly identifies
+JULES in Scene 1 via 'JULES (O.S.)'. The previous count of 3 continuity flags included
+a false-positive "JULES appears in only one scene" flag caused by the buggy parser
+missing that cue. Correct count is now 2. All other locked values are unchanged.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +30,7 @@ class SampleDemoTest(unittest.TestCase):
         self.assertEqual(d["title"], "Dust On The Glass")
         self.assertEqual(d["engine"], "local-heuristic")
         self.assertEqual(len(d["scenes"]), 4)
-        self.assertEqual(len(d["continuity_flags"]), 3)
+        self.assertEqual(len(d["continuity_flags"]), 2)
         self.assertEqual(len(d["shooting_groups"]), 4)
         self.assertEqual(d["characters"], ["ELENA", "JULES", "MARA"])
         self.assertEqual(d["locations"], ["SOLAR FARM", "CONTROL SHED", "ACCESS ROAD"])
