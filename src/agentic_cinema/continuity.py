@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 from agentic_cinema.models import ContinuityFlag, Scene
 
 # Maximum scene gap within which a same-time-of-day location jump is flagged as
@@ -81,4 +83,64 @@ def flag_continuity(scenes: list[Scene], *, max_scene_gap: int = _DEFAULT_TELEPO
                     message=f"{name} appears in only one scene. Easy to drop from a shooting day by accident.",
                 )
             )
+
+    flags.extend(_prop_continuity(scenes))
+    return flags
+
+
+def _prop_continuity(scenes: list[Scene]) -> list[ContinuityFlag]:
+    """Flag props that appear in only one non-final scene (introduced and never seen again)
+    and props that reappear after a gap of more than 3 scenes without re-introduction."""
+    if not scenes:
+        return []
+
+    # Build prop → sorted list of scene indices (0-based) where the prop is present
+    prop_scene_indices: dict[str, list[int]] = defaultdict(list)
+    for i, scene in enumerate(scenes):
+        for prop in scene.props:
+            prop_scene_indices[prop].append(i)
+
+    last_idx = len(scenes) - 1
+    flags: list[ContinuityFlag] = []
+
+    for prop, indices in sorted(prop_scene_indices.items()):
+        # Only flag props that appear in at least one non-final scene
+        non_final = [idx for idx in indices if idx != last_idx]
+        if not non_final:
+            continue
+
+        # Case 1: prop appears in exactly one scene and it is not the final scene —
+        # it was introduced but never referenced again.
+        if len(indices) == 1:
+            sc_num = scenes[indices[0]].number
+            flags.append(
+                ContinuityFlag(
+                    severity="info",
+                    scene_numbers=[sc_num],
+                    message=(
+                        f"Prop '{prop}' appears in Scene {sc_num} only. "
+                        f"Confirm it is intentionally dropped or add a later reference."
+                    ),
+                )
+            )
+            continue
+
+        # Case 2: prop reappears after a gap of more than 3 scenes — possible magic-prop error.
+        for a, b in zip(indices, indices[1:]):
+            gap = b - a
+            if gap > 3:
+                sc_a = scenes[a].number
+                sc_b = scenes[b].number
+                flags.append(
+                    ContinuityFlag(
+                        severity="info",
+                        scene_numbers=[sc_a, sc_b],
+                        message=(
+                            f"Prop '{prop}' seen in Scene {sc_a}, "
+                            f"absent for {gap} scenes, then reappears in Scene {sc_b}. "
+                            f"Confirm it was not left behind."
+                        ),
+                    )
+                )
+
     return flags

@@ -43,6 +43,7 @@ class BreakdownAgent:
             notes = []
         if not scenes:
             notes.append("No INT./EXT. scene headings found. Use a production-format script.")
+        quality_notes = _build_quality_notes(scenes, self.gemini, self.watsonx)
         bd = Breakdown(
             title=title,
             source=source_name,
@@ -54,6 +55,7 @@ class BreakdownAgent:
             continuity_flags=flag_continuity(scenes),
             shooting_groups=shooting_groups(scenes),
             notes=notes,
+            quality_notes=quality_notes,
         )
         refined = self.gemini.refine_breakdown(text, bd.to_dict())
         refined = self.watsonx.review_continuity(refined)
@@ -116,4 +118,41 @@ def _hydrate(data: dict[str, Any], *, source_name: str, original_scenes: list[Sc
         continuity_flags=flags,
         shooting_groups=groups,
         notes=list(data.get("notes") or []),
+        quality_notes=list(data.get("quality_notes") or []),
     )
+
+
+def _build_quality_notes(
+    scenes: list[Scene],
+    gemini: "GeminiClient",
+    watsonx: "WatsonxClient",
+) -> list[str]:
+    """Summarise analysis completeness for the coordinator."""
+    qn: list[str] = []
+    n = len(scenes)
+    if n == 0:
+        qn.append("No scenes parsed — check that the script uses INT./EXT. headings.")
+        return qn
+    qn.append(f"{n} scene{'s' if n != 1 else ''} parsed.")
+    chars_with_props = sum(1 for s in scenes if s.props)
+    qn.append(
+        f"Props extracted from {chars_with_props} of {n} scene{'s' if n != 1 else ''} "
+        f"using verb-pattern heuristic (picks up / grabs / holds etc.)."
+    )
+    vfx_scenes = [s.number for s in scenes if s.vfx_notes]
+    if vfx_scenes:
+        qn.append(f"VFX keywords detected in scene{'s' if len(vfx_scenes) != 1 else ''} {vfx_scenes}.")
+    else:
+        qn.append("No VFX keywords detected.")
+    if gemini.enabled:
+        qn.append(f"Gemini ({gemini.model}) will refine characters, props, and flags.")
+    else:
+        qn.append("Gemini not active (GEMINI_API_KEY not set) — using local heuristic only.")
+    if watsonx.enabled:
+        qn.append(f"IBM watsonx.ai ({watsonx.model}) will review continuity flags.")
+    else:
+        qn.append("IBM watsonx.ai not active (WATSONX_API_KEY / WATSONX_PROJECT_ID not set).")
+    qn.append(
+        "Prop detection uses verb patterns only — props mentioned without a handling verb may be missed."
+    )
+    return qn
