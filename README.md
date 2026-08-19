@@ -5,28 +5,29 @@ Hackathon: [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.de
 ## Assumptions
 
 - This repo is **private** for now. A judging submission will likely need a **public** repo plus a license file; that is not done here.
-- The first version is a **local heuristic agent**. It does **not** yet call Gemini, Agent Builder, or any partner MCP (IBM, Grafana, Parallel, ClickHouse, Replit). Those are required for a valid entry and are listed as next work, not as shipped.
-- Input is a production-format screenplay (INT./EXT. headings). Fountain-ish text works. PDF needs optional `pypdf`.
-- Continuity flags are conservative guesses, not a script supervisor.
-- Sample script is original, short, and written for the demo.
+- **Gemini is live** when `GEMINI_API_KEY` is set (official `google-genai` SDK). Without a key, the sample demo still runs on the local heuristic parser. That is intentional.
+- **Agent Builder / Agent Engine is not wired.** Neither is a partner MCP (IBM, Grafana, Parallel, ClickHouse, Replit). Those are the next two jobs, not shipped.
+- Input is a production-format screenplay (INT./EXT. headings). PDF needs optional `pypdf`.
+- Continuity flags are assists for an AD / script supervisor, not a replacement.
+- Sample script is original and short.
 
 ## The problem
 
-Pre-production still starts with a script supervisor and AD walking a screenplay by hand: who is in the scene, where it is, day or night, what has to be on the truck, what might be VFX, and which scenes can share a company move. Continuity errors (a character in two places with no time cut, a DAY/NIGHT flip on the same set) are cheap to miss on the page and expensive on the lot.
+Pre-production still starts with walking a screenplay by hand: who is in the scene, where it is, day or night, what has to be on the truck, what might be VFX, and which scenes can share a company move. Continuity misses are cheap on the page and expensive on the lot.
 
 ## The agent’s job
 
-Accept a screenplay (`.txt` now; `.pdf` if pypdf is installed). Return a structured breakdown:
+Accept a screenplay. Return a structured breakdown:
 
 - characters, locations, props
 - per-scene day/night and INT/EXT
-- VFX cue notes (keyword-level)
+- VFX notes
 - continuity risk flags
 - suggested shooting groups (same location + time of day)
 
-## Current technical state
+Local parse is the skeleton. Gemini refines it. Scene numbers are not invented.
 
-Working locally, no cloud:
+## Current technical state
 
 ```bash
 python3 -m pip install -e .
@@ -35,18 +36,25 @@ python3 -m agentic_cinema examples/sample_script.txt
 python3 examples/run_breakdown.py
 ```
 
-`BreakdownAgent.run()` is the public method. Gemini is a stub (`agents/gemini_client.py`) that only records that a key exists. No Google Cloud project is required to run the demo.
+With Gemini:
 
-## Next 3 development priorities
+```bash
+export GEMINI_API_KEY="your-key"   # from Google AI Studio; never commit it
+# optional: export GEMINI_MODEL=gemini-2.5-flash
+python3 -m agentic_cinema examples/sample_script.txt --json
+```
 
-1. **Gemini pass** — send the local breakdown + scene text to Gemini and replace/refine flags and VFX notes. Do not skip the local parse; use it as the grounded skeleton.
-2. **Agent Builder** — put BreakdownAgent behind Gemini Enterprise Agent Builder / Agent Engine so the entry actually runs on Google Cloud, not only on a laptop.
-3. **Partner track** — pick one of IBM, Grafana, Parallel, ClickHouse, or Replit and **call it in code** (required for judging). Not chosen yet.
+`BreakdownAgent.run()` is the public method. `engine` is `local-heuristic` without a key, or `local-heuristic+<model>` after a successful Gemini call. Failed Gemini calls fall back to the local breakdown and say so in `notes`.
+
+## Next two development priorities
+
+1. **Agent Builder on GCP** — run this agent on Gemini Enterprise Agent Builder / Agent Engine, not only as a local Python CLI.
+2. **Partner track** — pick one of IBM, Grafana, Parallel, ClickHouse, or Replit and **call it in code** (required for judging). Not chosen yet.
 
 ## Layout
 
 ```
 src/agentic_cinema/   models, parser, continuity, shooting groups
-agents/               BreakdownAgent + Gemini stub
+agents/               BreakdownAgent + Gemini client (google-genai)
 examples/             sample script + runner
 ```
